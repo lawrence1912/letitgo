@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- App Sandbox：上架 Mac App Store 必须开。本地开发默认不启用，
+	     用 `make app SANDBOX=1` 或在 Xcode 工程里打开。 -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+
+	<!-- 用户通过「打开」面板选中的文件，可读写。按需增删下面这些。 -->
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+
+	<!-- 需要联网时打开
+	<key>com.apple.security.network.client</key>
+	<true/>
+	-->
+</dict>
+</plist>

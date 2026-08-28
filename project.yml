@@ -1,0 +1,107 @@
+# XcodeGen 配置 —— 装好 Xcode 后跑 `make xcode` 生成 LetItGo.xcodeproj。
+#
+# 有意不通过 SPM 本地包引用，而是把每个模块声明成独立的 framework target：
+# 结构和 Package.swift 里的依赖图一一对应，两套构建系统各读各的源码目录，
+# 互不干扰。生成的工程是产物，不入库（见 .gitignore）。
+#
+# ⚠️ 本机尚未安装 Xcode，这份配置还没有实跑验证过。
+
+name: LetItGo
+
+options:
+  bundleIdPrefix: com.lawrence
+  deploymentTarget:
+    macOS: "15.0"
+  createIntermediateGroups: true
+  developmentLanguage: zh-Hans
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    SWIFT_UPCOMING_FEATURE_EXISTENTIAL_ANY: YES
+    # 打开 #Preview（这些宏插件只随 Xcode 分发，SwiftPM 构建时不定义）
+    SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) ENABLE_PREVIEWS"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEAD_CODE_STRIPPING: YES
+
+targetTemplates:
+  Module:
+    type: framework
+    platform: macOS
+    settings:
+      base:
+        SKIP_INSTALL: YES
+        BUILD_LIBRARY_FOR_DISTRIBUTION: NO
+        GENERATE_INFOPLIST_FILE: YES
+
+targets:
+  AppCore:
+    templates: [Module]
+    sources: [Sources/AppCore]
+
+  DesignSystem:
+    templates: [Module]
+    sources: [Sources/DesignSystem]
+    dependencies:
+      - target: AppCore
+
+  Persistence:
+    templates: [Module]
+    sources: [Sources/Persistence]
+    dependencies:
+      - target: AppCore
+
+  FeatureHome:
+    templates: [Module]
+    sources: [Sources/FeatureHome]
+    dependencies:
+      - target: AppCore
+      - target: DesignSystem
+
+  LetItGo:
+    type: application
+    platform: macOS
+    sources: [Sources/LetItGo]
+    dependencies:
+      - target: AppCore
+      - target: DesignSystem
+      - target: Persistence
+      - target: FeatureHome
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.lawrence.LetItGo
+        INFOPLIST_FILE: Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Resources/LetItGo.entitlements
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_HARDENED_RUNTIME: YES
+        COMBINE_HIDPI_IMAGES: YES
+
+  AppCoreTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources: [Tests/AppCoreTests]
+    dependencies:
+      - target: AppCore
+      - target: Persistence
+
+  FeatureHomeTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources: [Tests/FeatureHomeTests]
+    dependencies:
+      - target: FeatureHome
+      - target: Persistence
+
+schemes:
+  LetItGo:
+    build:
+      targets:
+        LetItGo: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets: [AppCoreTests, FeatureHomeTests]
