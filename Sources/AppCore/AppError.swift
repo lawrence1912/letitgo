@@ -5,12 +5,16 @@ import Foundation
 public enum AppError: Error, LocalizedError, Equatable, Sendable {
     case storage(String)
     case notFound
+    case invalidInput(String)
     case unexpected(String)
 
     public var errorDescription: String? {
         switch self {
         case .storage(let detail): "存储出错：\(detail)"
         case .notFound: "找不到对应的内容。"
+        // 输入校验的措辞由调用方给全，不加前缀 —— 「标题不能为空。」比
+        // 「出了点问题：标题不能为空。」更像是在说人话。
+        case .invalidInput(let detail): detail
         case .unexpected(let detail): "出了点问题：\(detail)"
         }
     }

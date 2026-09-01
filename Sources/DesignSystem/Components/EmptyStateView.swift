@@ -2,10 +2,15 @@ import SwiftUI
 
 /// 通用空态。骨架阶段每个界面都是空的，所以这个组件会被反复用到；
 /// 真实功能上线后它依然是「没有数据 / 没有搜索结果」的标准展示。
+///
+/// 空态要教会用户这个界面是干什么的，不是写一句「暂无数据」。
+/// 所以三段固定：图标底板（这是什么）、标题（现在是什么状态）、
+/// 说明（接下来能做什么），能给按钮就给按钮。
 public struct EmptyStateView: View {
     private let systemImage: String
     private let title: String
     private let message: String?
+    private let tone: Tone
     private let action: Action?
 
     public struct Action {
@@ -22,41 +27,43 @@ public struct EmptyStateView: View {
         systemImage: String,
         title: String,
         message: String? = nil,
+        tone: Tone = .neutral,
         action: Action? = nil
     ) {
         self.systemImage = systemImage
         self.title = title
         self.message = message
+        self.tone = tone
         self.action = action
     }
 
     public var body: some View {
-        VStack(spacing: Theme.Spacing.md) {
-            Image(systemName: systemImage)
-                .font(.system(size: 42, weight: .light))
-                .foregroundStyle(Theme.Palette.secondaryLabel)
+        VStack(spacing: 0) {
+            IconTile(systemImage, tone: tone, size: 52)
+                .padding(.bottom, Theme.Spacing.lg)
 
-            VStack(spacing: Theme.Spacing.xs) {
-                Text(title)
-                    .font(.title3.weight(.medium))
-                    .foregroundStyle(Theme.Palette.label)
+            Text(title)
+                .font(Theme.Typo.title)
+                .tracking(Theme.Typo.titleTracking)
+                .foregroundStyle(Theme.Ink.primary)
 
-                if let message {
-                    Text(message)
-                        .font(.callout)
-                        .foregroundStyle(Theme.Palette.secondaryLabel)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: 320)
-                }
+            if let message {
+                Text(message)
+                    .font(Theme.Typo.body)
+                    .foregroundStyle(Theme.Ink.secondary)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(2)
+                    .frame(maxWidth: 340)
+                    .padding(.top, Theme.Spacing.xs)
             }
 
             if let action {
                 Button(action.title, action: action.handler)
-                    .buttonStyle(.borderedProminent)
-                    .padding(.top, Theme.Spacing.xs)
+                    .buttonStyle(.primaryAction(size: .large))
+                    .padding(.top, Theme.Spacing.lg)
             }
         }
-        .padding(Theme.Spacing.xxl)
+        .padding(Theme.Spacing.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(title)
@@ -70,7 +77,7 @@ public struct EmptyStateView: View {
     EmptyStateView(
         systemImage: "tray",
         title: "还没有内容",
-        message: "这里会显示条目列表。现在功能还没接上。",
+        message: "这里会显示内容列表。现在功能还没接上。",
         action: .init(title: "新建", handler: {})
     )
     .frame(width: 520, height: 360)
