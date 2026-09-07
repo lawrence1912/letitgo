@@ -16,7 +16,12 @@ struct SettingsView: View {
             AdvancedSettingsView()
                 .tabItem { Label("高级", systemImage: "slider.horizontal.3") }
         }
-        .frame(width: 480, height: 280)
+        // 设置窗口是独立 Scene，环境不跟主窗口共享 —— accent 要再递一次，
+        // 否则这里的开关和分段控件会退回系统蓝（见 `RootView` 那条注释）。
+        .tint(Theme.Brand.accentFill)
+        // 宽度不再被主题选择器顶着走：它从「六套摆一行的分段控件」换成了
+        // 会自己换行的卡片网格（见 `ThemePicker`），加主题不再需要加宽窗口。
+        .frame(width: 560, height: 360)
     }
 }
 
@@ -35,15 +40,18 @@ private struct GeneralSettingsView: View {
                     .controlSize(.small)
                     // 开关继续用系统的（拖动手感、VoiceOver 角色都白送），
                     // 只把打开态的颜色换成品牌色 —— `.tint` 不改行为。
-                    .tint(Theme.Brand.accentFill)
                     .accessibilityLabel("启动时回到上次的分区")
             }
 
             Hairline()
 
+            // 主题这行控件另起一行：六套主题的分段控件有 460 宽，
+            // 和说明文字挤在同一行的话，被压掉的一定是左边那段说明
+            // （`ThemePicker` 自己 `fixedSize` 了，它不让步）。
             SettingsRow(
                 title: "主题",
-                detail: "换整套色板。和「外观」正交 —— 浅色 / 深色的选择不受影响。"
+                detail: "换整套色板。和「外观」正交 —— 浅色 / 深色的选择不受影响。",
+                stacked: true
             ) {
                 ThemePicker()
             }
@@ -57,38 +65,54 @@ private struct GeneralSettingsView: View {
                 AppearancePicker()
             }
         }
-        .panel()
+        .glassPanel()
         .padding(Theme.Spacing.lg)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .glassBackground(.content)
         .ambientBackdrop()
     }
 }
 
 /// 设置里的一行：左边说明，右边控件。所有分页共用，行高一致。
+///
+/// `stacked` 是给**放不下的控件**用的：控件挪到说明底下另起一行，
+/// 左对齐。判断标准很简单 —— 控件本身超过半行宽就摞起来，
+/// 挤在一行里的结果只会是说明文字被截断。
 private struct SettingsRow<Control: View>: View {
     let title: String
     let detail: String?
+    var stacked: Bool = false
     @ViewBuilder let control: Control
 
     var body: some View {
-        HStack(alignment: .center, spacing: Theme.Spacing.md) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title)
-                    .font(Theme.Typo.body)
-                    .foregroundStyle(Theme.Ink.primary)
-                if let detail {
-                    Text(detail)
-                        .font(Theme.Typo.caption)
-                        .foregroundStyle(Theme.Ink.secondary)
+        Group {
+            if stacked {
+                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                    caption
+                    control
+                }
+            } else {
+                HStack(alignment: .center, spacing: Theme.Spacing.md) {
+                    caption
+                    control
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            control
         }
         .padding(.horizontal, Theme.Spacing.md)
         .padding(.vertical, Theme.Spacing.md)
+    }
+
+    private var caption: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(title)
+                .font(Theme.Typo.body)
+                .foregroundStyle(Theme.Ink.primary)
+            if let detail {
+                Text(detail)
+                    .font(Theme.Typo.caption)
+                    .foregroundStyle(Theme.Ink.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -99,7 +123,6 @@ private struct AdvancedSettingsView: View {
             title: "暂无高级选项",
             message: "需要时在这里加。"
         )
-        .glassBackground(.content)
         .ambientBackdrop()
     }
 }

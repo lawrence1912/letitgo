@@ -10,7 +10,6 @@ public struct CodecView: View {
     public var body: some View {
         ToolPage {
             options
-            ToolNote(model.format.note)
             ToolInput(
                 title: model.direction == .encode ? "原文" : "密文 / 编码后的串",
                 placeholder: model.direction == .encode ? "要编码的文本" : "粘贴进来 —— 少了 = 或者带着换行都没关系",

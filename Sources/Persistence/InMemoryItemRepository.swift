@@ -22,6 +22,11 @@ public actor InMemoryItemRepository: ItemRepository {
         storage[item.id] = item
     }
 
+    public func update(_ item: Item) async throws {
+        guard storage[item.id] != nil else { throw AppError.notFound }
+        storage[item.id] = item
+    }
+
     public func delete(id: Item.ID) async throws {
         guard storage.removeValue(forKey: id) != nil else {
             throw AppError.notFound

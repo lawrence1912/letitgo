@@ -13,7 +13,7 @@ import AppCore
 /// 前两套的 `accent` 是个中间调的颜色（陶土 / 青），靠**色相**从灰底里跳出来。
 /// 这套跳不出来 —— 一个中间调的灰按钮读出来是「这个按钮是灰的（禁用了）」。
 /// 所以强调色走到色阶的尽头：浅色外观下是近黑（比正文还深一档），
-/// 深色外观下是近白（比正文还亮一档），`onAccent` 跟着翻个面。
+/// 深色外观下是近白（比正文还亮一档）。
 ///
 /// 于是有条一以贯之的规矩：**选中 / 主操作 = 往强调色那一端多走一步，
 /// 悬停只是浮起来一点。** 两者在明度上分得开，不靠色相：
@@ -52,6 +52,27 @@ extension Palette {
     } lookup: { token in
         switch token {
 
+        /// 左上的镜面高光。**它不进对比度合成链** —— 1px 的边不会压在正文底下，
+        /// 所以它可以比任何一个面都亮。玻璃的厚度全靠它。
+        case .rimSpecular: Ramp(
+            light: OKLCH(1.000, 0.000, 0, alpha: 0.85), dark: OKLCH(1.000, 0.000, 0, alpha: 0.62)
+        )
+        /// 右下的色散边。有厚度的玻璃会分光：一条边偏冷白，另一条偏主题自己的色。
+        case .rimDispersion: Ramp(
+            light: OKLCH(0.600, 0.000, 0,   alpha: 0.24), dark: OKLCH(0.870, 0.000, 0,   alpha: 0.34)
+        )
+
+        // MARK: 读写面
+        /// 正文躺着的那块地：代码框、结果区、长文本。
+        ///
+        /// **它是唯一一块不上玻璃的表面**，而且必须不上 —— 玻璃会折射背后的
+        /// 星球，一段等宽代码压在一片会动的折射上是读不下去的。
+        /// 玻璃管的是 chrome 和控件，这一块管的是「拿来读、拿来改」的东西。
+        case .well: Ramp(
+            light: OKLCH(0.933, 0.000, 0), dark: OKLCH(0.229, 0.000, 0),
+            lightHC: OKLCH(0.950, 0.000, 0), darkHC: OKLCH(0.170, 0.000, 0)
+        )
+
         // MARK: 氛围底与光晕
         case .backdrop: Ramp(
             light: OKLCH(0.920, 0.000, 0), dark: OKLCH(0.190, 0.000, 0),
@@ -73,133 +94,67 @@ extension Palette {
             darkHC: OKLCH(0.110, 0.000, 0, alpha: 0)
         )
 
+        // MARK: 这套主题不用的那几个槽位
+        /// 第三团光晕、网格、尾部高光 —— 全透明就是「这套主题没有这些东西」。
+        /// 星云那套才用得上（见 `Nebula.swift`）。
+        case .auraDeep, .gridLine: Ramp(
+            light: OKLCH(0, 0, 0, alpha: 0), dark: OKLCH(0, 0, 0, alpha: 0)
+        )
+
         // MARK: 薄膜
         //
         // alpha 和另外两套**一个字不差** —— 玻璃的厚度是材质，不是色板。
         // 换主题只该换颜色，不该换手感。
-        case .glassChrome: Ramp(
-            light: OKLCH(0.995, 0.000, 0, alpha: 0.34),
-            dark: OKLCH(0.995, 0.000, 0, alpha: 0.035),
-            lightHC: OKLCH(0.968, 0.000, 0), darkHC: OKLCH(0.145, 0.000, 0)
-        )
-        case .glassContent: Ramp(
-            light: OKLCH(0.995, 0.000, 0, alpha: 0.62),
-            dark: OKLCH(0.995, 0.000, 0, alpha: 0.065),
-            lightHC: OKLCH(1.000, 0.000, 0), darkHC: OKLCH(0.200, 0.000, 0)
-        )
-        case .glassPanel: Ramp(
-            light: OKLCH(0.995, 0.000, 0, alpha: 0.55),
-            dark: OKLCH(0.995, 0.000, 0, alpha: 0.075),
-            lightHC: OKLCH(0.990, 0.000, 0), darkHC: OKLCH(0.260, 0.000, 0)
-        )
-        case .glassWell: Ramp(
-            light: OKLCH(0.520, 0.000, 0, alpha: 0.08),
-            dark: OKLCH(0.030, 0.000, 0, alpha: 0.18),
-            lightHC: OKLCH(0.950, 0.000, 0), darkHC: OKLCH(0.170, 0.000, 0)
-        )
-        case .glassFloating: Ramp(
-            light: OKLCH(0.995, 0.000, 0, alpha: 0.78),
-            dark: OKLCH(0.995, 0.000, 0, alpha: 0.085),
-            lightHC: OKLCH(0.990, 0.000, 0), darkHC: OKLCH(0.260, 0.000, 0)
-        )
         /// 悬停。合成后落在 content 和 panel 之间，可点的东西才用。
-        case .glassHover: Ramp(
+        case .hover: Ramp(
             light: OKLCH(0.700, 0.000, 0, alpha: 0.10),
             dark: OKLCH(0.995, 0.000, 0, alpha: 0.10),
             lightHC: OKLCH(0.920, 0.000, 0), darkHC: OKLCH(0.345, 0.000, 0)
         )
 
         // MARK: 边缘与投影
-        case .glassRim: Ramp(
+        case .border: Ramp(
             light: OKLCH(0.520, 0.000, 0, alpha: 0.20),
             dark: OKLCH(0.995, 0.000, 0, alpha: 0.21),
             lightHC: OKLCH(0.700, 0.000, 0), darkHC: OKLCH(0.520, 0.000, 0)
         )
-        case .glassRimStrong: Ramp(
+        case .borderStrong: Ramp(
             light: OKLCH(0.420, 0.000, 0, alpha: 0.30),
             dark: OKLCH(0.995, 0.000, 0, alpha: 0.32),
             lightHC: OKLCH(0.560, 0.000, 0), darkHC: OKLCH(0.640, 0.000, 0)
         )
-        /// 左上那道高光。这套里它是**纯白** —— 另外两套还带着半点暖 / 冷。
-        /// 增强对比度下归零：它是装饰，不承担信息。
-        case .glassHighlight: Ramp(
-            light: OKLCH(1.000, 0.000, 0, alpha: 0.85),
-            dark: OKLCH(1.000, 0.000, 0, alpha: 0.28),
-            lightHC: OKLCH(1.000, 0.000, 0, alpha: 0),
-            darkHC: OKLCH(1.000, 0.000, 0, alpha: 0)
-        )
-        case .glassShadow: Ramp(
-            light: OKLCH(0.30, 0.000, 0, alpha: 0.09),
-            dark: OKLCH(0.04, 0.000, 0, alpha: 0.45)
-        )
-        case .glassShadowFloating: Ramp(
-            light: OKLCH(0.30, 0.000, 0, alpha: 0.16),
-            dark: OKLCH(0.04, 0.000, 0, alpha: 0.60)
-        )
 
-        // MARK: 实心替身（减弱透明度时用）
-        /// 以下八个是按玻璃合成结果**反解**出来的：把薄膜压在氛围底上算出最终亮度，
-        /// 再取亮度相同的实心灰（OKLCH 的 L 就是 WCAG 亮度的立方根，这套没有色相
-        /// 掺和，反解是准的）。所以开不开透明度，四层的观感一样。
-        case .canvas: Ramp(
-            light: OKLCH(0.946, 0.000, 0), dark: OKLCH(0.226, 0.000, 0),
-            lightHC: OKLCH(0.968, 0.000, 0), darkHC: OKLCH(0.145, 0.000, 0)
-        )
-        case .content: Ramp(
-            light: OKLCH(0.967, 0.000, 0), dark: OKLCH(0.256, 0.000, 0),
-            lightHC: OKLCH(1.000, 0.000, 0), darkHC: OKLCH(0.200, 0.000, 0)
-        )
-        case .raised: Ramp(
-            light: OKLCH(0.982, 0.000, 0), dark: OKLCH(0.322, 0.000, 0),
-            lightHC: OKLCH(0.990, 0.000, 0), darkHC: OKLCH(0.260, 0.000, 0)
-        )
-        case .sunken: Ramp(
-            light: OKLCH(0.933, 0.000, 0), dark: OKLCH(0.229, 0.000, 0),
-            lightHC: OKLCH(0.950, 0.000, 0), darkHC: OKLCH(0.170, 0.000, 0)
-        )
-        case .hover: Ramp(
-            light: OKLCH(0.922, 0.000, 0), dark: OKLCH(0.319, 0.000, 0),
-            lightHC: OKLCH(0.920, 0.000, 0), darkHC: OKLCH(0.345, 0.000, 0)
-        )
-        case .border: Ramp(
-            light: OKLCH(0.865, 0.000, 0), dark: OKLCH(0.414, 0.000, 0),
-            lightHC: OKLCH(0.700, 0.000, 0), darkHC: OKLCH(0.520, 0.000, 0)
-        )
-        case .borderStrong: Ramp(
-            light: OKLCH(0.798, 0.000, 0), dark: OKLCH(0.503, 0.000, 0),
-            lightHC: OKLCH(0.560, 0.000, 0), darkHC: OKLCH(0.640, 0.000, 0)
-        )
-        case .shadow: Ramp(
-            light: OKLCH(0.30, 0.000, 0, alpha: 0.10),
-            dark: OKLCH(0.04, 0.000, 0, alpha: 0.50)
-        )
-
-        // MARK: 文字
         case .ink: Ramp(
             light: OKLCH(0.255, 0.000, 0), dark: OKLCH(0.945, 0.000, 0),
             lightHC: OKLCH(0.160, 0.000, 0), darkHC: OKLCH(1.000, 0.000, 0)
         )
         case .inkSecondary: Ramp(
-            light: OKLCH(0.455, 0.000, 0), dark: OKLCH(0.775, 0.000, 0),
-            lightHC: OKLCH(0.380, 0.000, 0), darkHC: OKLCH(0.860, 0.000, 0)
+            light: OKLCH(0.400, 0.000, 0), dark: OKLCH(0.855, 0.000, 0),
+            lightHC: OKLCH(0.330, 0.000, 0), darkHC: OKLCH(0.935, 0.000, 0)
         )
         case .inkTertiary: Ramp(
-            light: OKLCH(0.575, 0.000, 0), dark: OKLCH(0.675, 0.000, 0),
-            lightHC: OKLCH(0.470, 0.000, 0), darkHC: OKLCH(0.760, 0.000, 0)
+            light: OKLCH(0.500, 0.000, 0), dark: OKLCH(0.730, 0.000, 0),
+            lightHC: OKLCH(0.425, 0.000, 0), darkHC: OKLCH(0.820, 0.000, 0)
         )
 
         // MARK: 石墨（accent）
         /// 强调色**文字 / 图标**：色阶的尽头，比正文还多走一档。
         /// 「选中」在这套主题里是**更黑 / 更白**，不是「变成另一个颜色」。
+        /// 焦点环：比 `accent` 亮一档、浓一档。深色档和 accent 同值 ——
+        /// 那一档它本来就够亮了，深的是浅色档。
+        case .focusRing: Ramp(
+            light: OKLCH(0.400, 0.000, 0), dark: OKLCH(0.995, 0.000, 0),
+            lightHC: OKLCH(0.130, 0.000, 0), darkHC: OKLCH(1.000, 0.000, 0)
+        )
         case .accent: Ramp(
             light: OKLCH(0.185, 0.000, 0), dark: OKLCH(0.995, 0.000, 0),
             lightHC: OKLCH(0.130, 0.000, 0), darkHC: OKLCH(1.000, 0.000, 0)
         )
         /// 实心填充。**全屏唯一允许比周围响一档的东西** —— 这套里「响」不是饱和度，
         /// 是明度落差：浅色下一块石墨压在近白纸上，深色下一块近白压在深灰上。
-        /// 配 `onAccent` 有 11.7:1（深色 14.7:1）。
+        /// 它现在是**递给系统的那个颜色**（`.tint()` 和玻璃的 tint），字色由系统自己配。
         case .accentFill: Ramp(
-            light: OKLCH(0.330, 0.000, 0), dark: OKLCH(0.930, 0.000, 0),
+            light: OKLCH(0.285, 0.000, 0), dark: OKLCH(0.930, 0.000, 0),
             lightHC: OKLCH(0.250, 0.000, 0), darkHC: OKLCH(0.965, 0.000, 0)
         )
         /// 选中块。刻意压得比另外两套重（浅色 alpha 0.40，深色反着往亮里走）——
@@ -214,17 +169,6 @@ extension Palette {
             dark: OKLCH(0.780, 0.000, 0, alpha: 0.45),
             lightHC: OKLCH(0.520, 0.000, 0), darkHC: OKLCH(0.680, 0.000, 0)
         )
-        /// 压在 `accentFill` 上的字。另外两套是近黑（它们的填充在两种外观下都是亮色），
-        /// 这套**两种外观是反的** —— 浅色下近白压石墨，深色下近黑压近白。
-        case .onAccent: Ramp(
-            light: OKLCH(0.985, 0.000, 0), dark: OKLCH(0.200, 0.000, 0),
-            lightHC: OKLCH(1.000, 0.000, 0), darkHC: OKLCH(0.145, 0.000, 0)
-        )
-
-        // MARK: 蓝 / 绿 / 红
-        //
-        // 这三个是全屏仅有的颜色。没有别的颜色跟它们抢，所以 chroma 比雾青还低一档
-        // 也照样读得出是什么色 —— 中性底上的低饱和色不会被周围的色相拉走。
 
         case .info: Ramp(
             light: OKLCH(0.480, 0.045, 250), dark: OKLCH(0.775, 0.042, 250),

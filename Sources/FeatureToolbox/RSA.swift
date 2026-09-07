@@ -43,19 +43,6 @@ public enum RSA {
             }
         }
 
-        /// Java 那边对应的 transformation 字符串，以及**对不上的地方**。
-        public var note: String {
-            switch self {
-            case .pkcs1:
-                "对应 Cipher.getInstance(\"RSA/ECB/PKCS1Padding\")"
-            case .oaepSHA1:
-                "对应 \"RSA/ECB/OAEPWithSHA-1AndMGF1Padding\""
-            case .oaepSHA256:
-                "对应 \"RSA/ECB/OAEPWithSHA-256AndMGF1Padding\" —— 但 JDK 里那个串的 MGF1 仍然用 SHA-1，"
-                    + "要显式传 OAEPParameterSpec 才和这里一致，否则两边解不开"
-            }
-        }
-
         var algorithm: SecKeyAlgorithm {
             switch self {
             case .pkcs1: .rsaEncryptionPKCS1

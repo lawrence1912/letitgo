@@ -1,219 +1,314 @@
-import AppKit
 import SwiftUI
 
 // MARK: - 玻璃
 //
-// 这套界面的表面不再是实心色块，而是**压在一层氛围底上的半透明薄膜**。
-// 一块面板的最终颜色 = 氛围底 → 下面每一层薄膜 → 它自己，逐层合成出来的。
+// macOS 26 之后，玻璃是**系统的一层光学材质**，不再是自己拼出来的一叠颜色。
+// 这个文件因此从七百多行掉到不足两百行 —— 删掉的那些（薄膜、边缘高光、
+// 投影、斜光，以及顶面高光 / 底缘聚光 / 色散边那一套「宝石」）
+// 全部是在**模仿**一件系统现在自己会做的事。
 //
-// ## 为什么模糊的是自己画的东西，不是桌面
+// ## 为什么模仿再准也只是模仿
 //
-// 「毛玻璃」在 macOS 上最抢眼的做法是 `behindWindow` 混合 —— 直接把桌面壁纸
-// 卷进来。这里**没有**这么做，原因只有一个：壁纸是用户的，亮度随时会变，
-// 压在上面的正文就没法算对比度了。算过：浅色外观下把一张黑壁纸垫在
-// 半透明表面后面，次级文字会从 6.6:1 掉到 2.7:1 —— 而要把它救回 4.5:1，
-// 薄膜得浓到 0.8 以上，那时候「玻璃」已经不透了，白折腾一场。
+// 自己画的「玻璃」是一层**贴在屏幕上的颜色**：它不知道背后是什么，
+// 所以它不会折射，边缘不会随着背后的亮暗改变浓度，挪动窗口时它纹丝不动。
+// 上一版靠三件事去补：薄膜的浓度差、有方向的发丝边、位移很小的投影 ——
+// 补得挺像，但它补的是「看上去像玻璃」，不是「是玻璃」。
 //
-// 所以底下垫的是应用自己画的一层氛围底（`AmbientBackdrop`），亮度带是已知的，
-// 模糊一律走 `withinWindow`（只模糊窗口内自己画的东西）。代价是看不见壁纸，
-// 换来的是**四种外观下的对比度仍然是算出来的**，和换风格之前一样。
+// `glassEffect` 是后者：它**采样背后的内容**，把它弯折、聚焦、按亮度自适应
+// 前景色。所以同一块面板压在星球的亮环上和压在暗处，出来是两种边缘，
+// 而这件事没有任何一组静态色值写得出来。
 //
-// ## 三件套，缺一件就不像玻璃
+// ## 代价：对比度不再是「算出来的」
 //
-//   1. **薄膜**：半透明着色层，让下面的氛围底透上来。只有这个 → 像蒙了层雾。
-//   2. **边缘高光**：左上亮、右下淡的一圈发丝描边。玻璃的厚度全靠它 ——
-//      少了它，半透明面板会糊在背景里，看不出是「一块」。
-//   3. **投影**：柔、散、位移小。它说明这块玻璃浮在多高的地方。
+// 上一版有一整套合成测试，把「氛围底 → 每一层薄膜 → 文字」逐层算一遍。
+// 那套算法的前提是**每一层都是我们自己画的**，现在这个前提没了：
+// 系统材质怎么混，我们既不知道也不该假设。
 //
-// ## 减弱透明度时整套让位
+// 换来的是系统自己在保证这件事（Liquid Glass 会按背后的内容调前景），
+// 而我们守住**还归自己管**的那部分：
 //
-// 系统辅助功能里的「减弱透明度」一开，薄膜全部换成实心色（`GlassLevel.opaque`），
-// 模糊层不创建。增强对比度那两档外观走的是同一条路 —— 薄膜的 alpha 直接是 1。
-// 玻璃是第一个该让位的东西。
+//   - 玻璃底下垫什么（`Theme.Field`，见下面「氛围场」一节）——
+//     这是唯一还能算的一层，测试仍然算它。
+//   - 正文永远是实色，永远不上渐变，永远不靠玻璃提供对比度。
+//   - tint 只表达**响度**，不表达装饰。
+//
+// ## 一条硬规矩：玻璃底下必须有东西
+//
+// 一块玻璃背后什么都没有的时候，它出来就是一块灰板 —— 因为它折射的是虚空。
+// 所以 `AmbientBackdrop` 不是装饰，它是这套材质的**前提**：
+// 星球、外晕和那层细网格给玻璃提供了可折射的起伏和可对齐的规律。
+// 移动窗口、滚动内容时看得出层次，靠的就是它。
+//
+// ## 什么东西不该是玻璃
+//
+// 上一条反过来还有一半：**会动的背景是给 chrome 用的，不是给正文用的。**
+//
+// 一段等宽代码压在一片会折射的东西上是读不下去的 —— 每挪一下窗口，
+// 字底下的亮度就变一次。所以这套界面里有一块表面**刻意不上玻璃**：
+// `Theme.Surface.well`，代码框、结果区、长文本躺的那块地。
+//
+// 分工是这么划的：
+//
+// | | 材质 | 为什么 |
+// |---|---|---|
+// | 窗口 chrome、工具栏、边栏 | 系统玻璃 | 它们浮在内容上，要让人看出「底下还有东西」 |
+// | 控件、徽章、卡片 | 系统玻璃 | 小、短、可点，折射是反馈的一部分 |
+// | 代码框、结果区、长文本 | `Surface.well` | 拿来读和改的东西，底下不能动 |
+//
+// 判断标准不是「这块大不大」，是**「这上面的字要读多久」**。
 
-/// 玻璃层级。决定薄膜多浓、要不要真模糊、边缘怎么画、投不投影。
-public enum GlassLevel: Sendable, Hashable, CaseIterable {
-    /// 应用外壳：侧边栏、底部操作条。薄膜最薄，氛围底透得最多，所以外壳
-    /// 天然比内容区暗一档 —— 和换风格之前的层次关系一样，只是换了实现方式。
-    case chrome
-    /// **底下有东西在滚**的外壳：页头、状态栏。和 `chrome` 同一档薄膜，
-    /// 但多一层真模糊 —— 不加的话，列表的文字会从 34% 的薄膜底下清清楚楚
-    /// 透上来，和标题叠成一团。
-    case frosted
-    /// 主工作区。
-    case content
-    /// 浮在内容上的面板 / 卡片 / 行。
-    case panel
-    /// 陷进去的槽：输入框、拖放区、分段控件的底。压暗，不是提亮。
-    case well
-    /// 真正浮起来的东西：sheet、弹出面板。唯一带大投影的一档。
-    case floating
-
-    /// 半透明薄膜。压在下层之上，合成结果由「下面是什么」决定。
-    var film: Color {
-        switch self {
-        case .chrome, .frosted: ColorToken.glassChrome.color
-        case .content: ColorToken.glassContent.color
-        case .panel: Theme.Glass.panel
-        case .well: Theme.Glass.well
-        case .floating: ColorToken.glassFloating.color
-        }
-    }
-
-    /// 减弱透明度时的替身。走的是原来那套实心色阶，一比一对应。
-    var opaque: Color {
-        switch self {
-        case .chrome, .frosted: Theme.Surface.canvas
-        case .content: Theme.Surface.content
-        case .panel: Theme.Surface.raised
-        case .well: Theme.Surface.sunken
-        case .floating: Theme.Surface.raised
-        }
-    }
-
-    /// **只有 `frosted` 真模糊。** 别的层底下是一片平滑的氛围底，
-    /// 模糊它等于什么都没做 —— 而系统材质本身是半不透明的，垫在那儿只会把
-    /// 自己画的氛围底盖掉，玻璃就没东西可透了。侧边栏、面板、浮层都不用。
-    var blurs: Bool { self == .frosted }
-
-    /// 材质只提供**模糊**，颜色由上面的薄膜决定 —— 所以挑的是两套外观下
-    /// 都跟着窗口底色走的中性材质（`.headerView` 就是系统给工具条 / 页头用的
-    /// 那一块），不挑 `.hudWindow` 那种自带强色的：那种会把颜色也一起接管。
-    var material: NSVisualEffectView.Material { .headerView }
-
-    /// 边缘高光的浓度。面板和浮层最厚；槽是凹的，没有高光；
-    /// 内容区是通栏底，本来就不描边。
-    var highlight: Double {
-        switch self {
-        case .chrome, .frosted: 0.6
-        case .content: 0.0
-        case .panel: 1.0
-        case .well: 0.0
-        case .floating: 1.0
-        }
-    }
-}
-
-// MARK: - 令牌
+// MARK: - 氛围场
 
 extension Theme {
 
-    /// 玻璃专用令牌。中性色阶（`Theme.Surface`）没有消失 ——
-    /// 它现在是「减弱透明度」时的那套替身，日常画界面从这里取。
-    public enum Glass {
-        /// 氛围底：所有玻璃压在它上面。**不透明**，所以整套合成是确定的。
-        public static let backdrop = ColorToken.backdrop.color
-        /// 左上那团光晕。氛围底上的一团，给玻璃一点可折射的东西。
-        public static let auraLead = ColorToken.auraLead.color
-        /// 右下那团。和 `auraLead` 是邻近色，不是补色 —— 前两套主题都守这条；
-        /// 素白没有色相可分，两团只剩一提亮一压暗。
-        public static let auraTrail = ColorToken.auraTrail.color
+    /// 玻璃**背后**那一层。所有玻璃折射的都是它。
+    ///
+    /// 它是不透明的、自己画的，所以亮度带是已知的 ——
+    /// 这是整套界面里唯一还能把对比度算准的一层，也是唯一需要算的一层。
+    ///
+    /// 刻意**不用** `.behindWindow` 把桌面壁纸卷进来：壁纸是用户的，
+    /// 亮度随时会变，卷进来之后连这一层也没法算了。
+    @MainActor
+    public enum Field {
+        /// 氛围底。不透明。
+        public static var backdrop: Color { ColorToken.backdrop.color }
+        /// 能量星球的发光环。
+        public static var auraLead: Color { ColorToken.auraLead.color }
+        /// 星球的暗球体。和 `auraLead` 是邻近色，不是补色。
+        public static var auraTrail: Color { ColorToken.auraTrail.color }
+        /// 星球的外晕；不需要第三层的主题把它设为全透明。
+        public static var auraDeep: Color { ColorToken.auraDeep.color }
+        /// 氛围底上那层细网格 —— 玻璃底下的「规律」。
+        public static var grid: Color { ColorToken.gridLine.color }
+    }
 
-        /// 悬停填充。半透明 —— 压在侧边栏、行、按钮上都成立。只用于可点的东西。
-        public static let hover = ColorToken.glassHover.color
-        /// 面板薄膜。自绘控件（按钮、导航项）自己拼背景时用它，
-        /// 拼出来的东西才和 `.panel()` 是同一块玻璃。
-        public static let panel = ColorToken.glassPanel.color
-        /// 槽薄膜。
-        public static let well = ColorToken.glassWell.color
+    /// 玻璃**管不着**的那几件事。
+    ///
+    /// 分割线、自绘行的悬停底、需要**读出来**的边界（拖放高亮、聚焦的输入框），
+    /// 以及玻璃那圈**镜面边**。
+    ///
+    /// ## 关于那圈边，改过一次口
+    ///
+    /// 这里原来写着「系统玻璃自带边缘，不要再描一圈」。那句话对了一半：
+    /// 再描一圈**同性质**的边确实只会让边变粗。
+    ///
+    /// 但系统那圈边是为 OS chrome 调的 —— 它要的是克制，压在深色氛围场上几乎读不出来，
+    /// 一屏卡片因此读成一排深色方块，而不是一排玻璃。
+    ///
+    /// 补的这一圈**不是同一件事**：它是有方向的**镜面高光**（左上冷白 → 右下色散），
+    /// 说的是「光落在这块玻璃的棱上」，而系统那圈说的是「这里有个边界」。
+    /// 两件事叠在一起不冲突 —— 现实里的玻璃也是既有轮廓又有高光。
+    ///
+    /// 它便宜也是有原因的：**1px 的边不进对比度合成链**（正文压不到边上），
+    /// 所以它可以比任何一个面都亮，而不用还任何东西。
+    /// 这条是上一版就验证过的，那时候它是唯一的玻璃感来源；
+    /// 现在它退回成配角，但仍然是最划算的那一层。
+    @MainActor
+    public enum Line {
+        /// 发丝分割线。
+        public static var hairline: Color { ColorToken.border.color }
+        /// 需要读出来的边界。
+        public static var strong: Color { ColorToken.borderStrong.color }
 
-        /// 玻璃的一圈发丝边。半透明 —— 压在哪一层上都能读出边界。
-        public static let rim = ColorToken.glassRim.color
-        /// 需要读出来的边界（聚焦、拖放高亮的容器）。
-        public static let rimStrong = ColorToken.glassRimStrong.color
-        /// 左上角那道高光。玻璃的厚度全靠它。
-        public static let highlight = ColorToken.glassHighlight.color
+        /// 一块玻璃的边：左上是**光**（冷白），右下是**色**（主题自己的色）。
+        ///
+        /// 中间那两段是全透明的 —— 一圈粗细均匀的亮边读成的是「描了个框」，
+        /// 只有两头亮、中间断，才读成「光落在这块玻璃的两条棱上」。
+        ///
+        /// 方向永远是左上 → 右下，和星球的光源同一个角。每块玻璃各挑一个角度的话，
+        /// 一屏上的光就来自四面八方 —— 那不是设计，是没对齐。
+        /// 玻璃**表面**那道斜光：左上一小片冷白，很快化掉。
+        ///
+        /// 它和 `rim` 是一对：`rim` 说「光落在棱上」，这道说「光扫过面上」。
+        /// 只有棱没有面的话，一块玻璃读成的是一个描了亮边的深色方块。
+        ///
+        /// **它进对比度合成链**（正文压在它上面），所以浓度只有边的零头 ——
+        /// 边可以到 0.85，这里 0.07。棱和面的预算不是一回事。
+        ///
+        /// 这个数是从 0.16 收下来的：0.16 那一版把卡片和按钮洗成了**塑料糖豆** ——
+        /// 一层看得见的白洗 在表面上，读成的是「这块东西是白的」，
+        /// 不是「有光扫过它」。光该是**察觉不到的一层**，只在余光里说明有个光源。
+        static var sheen: LinearGradient {
+            LinearGradient(
+                stops: [
+                    .init(color: ColorToken.rimSpecular.color.opacity(0.07), location: 0),
+                    .init(color: .clear, location: 0.55),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
 
-        /// 面板投影。比换风格之前更散、位移更小 —— 玻璃是浮着的，不是贴着的。
-        public static let shadow = ColorToken.glassShadow.color
-        /// 浮层投影。
-        public static let shadowFloating = ColorToken.glassShadowFloating.color
+        /// 镜面高光的原色。控件上那道**顶面亮带**（`GlassGloss`）直接取它。
+        static var specular: Color { ColorToken.rimSpecular.color }
+
+        static var rim: LinearGradient {
+            LinearGradient(
+                stops: [
+                    .init(color: ColorToken.rimSpecular.color, location: 0),
+                    .init(color: ColorToken.rimSpecular.color.opacity(0.12), location: 0.34),
+                    .init(color: .clear, location: 0.56),
+                    .init(color: ColorToken.rimDispersion.color, location: 1),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+    }
+
+    @MainActor
+    public enum Fill {
+        /// 悬停填充。只用于可点的东西。
+        public static var hover: Color { ColorToken.hover.color }
+    }
+
+    /// **不是**玻璃的那块表面。
+    @MainActor
+    public enum Surface {
+        /// 正文躺着的那块地：代码框、结果区、长文本。
+        /// 见上面「什么东西不该是玻璃」。
+        public static var well: Color { ColorToken.well.color }
     }
 }
 
-// MARK: - 模糊层
+// MARK: - 一块玻璃
 
-/// 真模糊。只在 `GlassLevel.blurs` 为真的层上创建。
+/// 一块玻璃的**响度**。
 ///
-/// `blendingMode` 固定 `.withinWindow`：只模糊**窗口内自己画的东西**。
-/// 不用 `.behindWindow` 的理由写在本文件顶部 —— 一句话，桌面壁纸的亮度是用户的，
-/// 卷进来之后这套界面的对比度就没法算了。
-private struct BackdropBlur: NSViewRepresentable {
-    let material: NSVisualEffectView.Material
+/// tint 在这套界面里只表达一件事：**这块东西此刻有多重要**。
+/// 它不是装饰色，也不是分类色 —— 分类靠图标色（`IconTint`），那是另一回事。
+///
+/// 规矩没变：**一屏只有一个响亮的东西**。`accent` 留给主操作和当前选中，
+/// 语义色只在真的发生了那件事时出现。
+/// **这里没有「强调色填充」那一档，而且是故意的。**
+/// 一屏最多一个响亮的东西，那个名额属于主操作 —— 而主操作走的是系统的
+/// `.glassProminent`（见 `ButtonStyles.swift`），不从这里取色。
+/// 「当前选中」比主操作低一档，所以它用的是 `.semantic(.accent)`，
+/// 也就是 `accentSoft`：认得出来，但不抢。
+public enum GlassTone: Sendable, Hashable {
+    /// 不上色。绝大多数容器走这档。
+    case plain
+    /// 上色。语义色（提示条、徽章、状态）和「当前选中」（`.accent`）都走它。
+    case semantic(Tone)
 
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let view = NSVisualEffectView()
-        view.material = material
-        view.blendingMode = .withinWindow
-        // .followsWindowActiveState 会让窗口失焦时整块玻璃塌下去，
-        // 一个装着工具的外壳不该在你去看别的窗口时变个样。
-        view.state = .active
-        return view
-    }
-
-    func updateNSView(_ view: NSVisualEffectView, context: Context) {
-        view.material = material
-    }
-}
-
-// MARK: - 玻璃表面
-
-/// 一层玻璃：模糊（可选）+ 薄膜。不裁剪、不描边、不投影 ——
-/// 通栏区域（内容区、侧边栏、页头）用它，圆角面板走 `panel()`。
-public struct GlassPane: View {
-    private let level: GlassLevel
-
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-
-    public init(_ level: GlassLevel) {
-        self.level = level
-    }
-
-    public var body: some View {
-        if reduceTransparency {
-            level.opaque
-        } else {
-            ZStack {
-                if level.blurs {
-                    BackdropBlur(material: level.material)
-                }
-                level.film
-            }
+    @MainActor
+    var tint: Color? {
+        switch self {
+        case .plain: nil
+        case .semantic(let tone): tone.soft
         }
     }
 }
 
 extension View {
 
-    /// 一整片玻璃底。通栏区域用它。
-    public func glassBackground(_ level: GlassLevel) -> some View {
-        background(GlassPane(level))
+    /// 一块玻璃面板：卡片、行、浮层、分组容器。
+    ///
+    /// **不要再往它身上加描边、渐变或投影。** 那三样都是系统这层材质自己的
+    /// 一部分，补上去只会和它打架 —— 一圈自绘的边压在系统的边缘高光上，
+    /// 读出来是「描粗了」，不是「更清楚」。
+    ///
+    /// - Parameters:
+    ///   - tone: 响度。默认不上色。
+    ///   - radius: 圆角。容器走 `Theme.Radius.md` / `.lg`；
+    ///     可点的小东西走 `glassControl()`，那边是胶囊。
+    ///   - interactive: 这块玻璃**能不能按**。开了之后系统会给它
+    ///     指针和按压的光学反馈（材质自己形变，不是我们做的动画）。
+    ///     容器不要开 —— 一张不能点的卡片跟着鼠标闪，是在撒谎。
+    public func glassPanel(
+        _ tone: GlassTone = .plain,
+        radius: CGFloat = Theme.Radius.md,
+        interactive: Bool = false
+    ) -> some View {
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        // 顺序就是玻璃的剖面：材质在最下，斜光扫在它的面上，内容站在斜光之上，
+        // 最后那圈镜面边绕着轮廓走。
+        //
+        // 斜光走 `.background` 而不是 `.overlay`，就是为了让它落在**内容底下** ——
+        // 压在字上面的一层白洗会把正文洗淡，那是给玻璃加光，不是给字减对比度。
+        return background { shape.fill(Theme.Line.sheen) }
+            .glassEffect(glass(tone, interactive: interactive), in: shape)
+            .overlay { shape.strokeBorder(Theme.Line.rim, lineWidth: 1) }
     }
 
-    /// 边缘高光：左上亮、右下淡的一圈发丝描边，压在最上层。
-    ///
-    /// 这是玻璃的厚度所在。少了它，半透明面板会糊进背景里 ——
-    /// 看得出「这里颜色浅了一点」，看不出「这里有一块东西」。
-    func glassRim(
-        _ shape: some InsettableShape,
-        rim: Color,
-        highlight: Double
-    ) -> some View {
-        overlay {
-            shape.strokeBorder(rim, lineWidth: 1)
+
+    private func glass(_ tone: GlassTone, interactive: Bool) -> Glass {
+        Glass.regular.tint(tone.tint).interactive(interactive)
+    }
+}
+
+// MARK: - 当前选中
+
+/// 边栏、主题格和待办共用的选中底：浅色调与左侧亮线。
+/// 选中切换只改变颜色，避免新增玻璃材质时产生折射跳变。
+public struct SelectionSurface: View {
+    private let isSelected: Bool
+    private let radius: CGFloat
+
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
+
+    public init(isSelected: Bool, radius: CGFloat = Theme.Radius.md) {
+        self.isSelected = isSelected
+        self.radius = radius
+    }
+
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: radius, style: .continuous)
+    }
+
+    public var body: some View {
+        if isSelected {
+            shape
+                .fill(LinearGradient(
+                    colors: [Theme.Brand.accentSoft, Theme.Brand.accentSoft.opacity(0.25)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ))
+                .background {
+                    if reduceTransparency || contrast == .increased {
+                        shape.fill(Theme.Surface.well)
+                    }
+                }
+                .overlay {
+                    shape.strokeBorder(
+                        contrast == .increased ? Theme.Brand.focusRing : Theme.Brand.accent.opacity(0.24),
+                        lineWidth: 1
+                    )
+                }
+                .overlay(alignment: .leading) {
+                    Capsule()
+                        .fill(Theme.Brand.accent)
+                        .frame(width: 2)
+                        .padding(.vertical, Theme.Spacing.sm)
+                }
+                .transition(.identity)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
         }
-        .overlay {
-            shape.strokeBorder(
-                LinearGradient(
-                    stops: [
-                        .init(color: Theme.Glass.highlight.opacity(highlight), location: 0),
-                        .init(color: .clear, location: 0.45),
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ),
-                lineWidth: 1
+    }
+}
+
+// MARK: - 分割线
+
+/// 用自己的色阶画的分割线。SwiftUI 的 `Divider()` 走系统 separator 色，
+/// 混在这套色阶里会偏亮 / 偏冷一档。
+///
+/// 玻璃面板**之间**通常不需要它 —— 两块玻璃自己就分得开。
+/// 它是给一块玻璃**内部**分区用的（一张卡片里上下两段内容）。
+public struct Hairline: View {
+    private let axis: Axis
+
+    public init(_ axis: Axis = .horizontal) {
+        self.axis = axis
+    }
+
+    public var body: some View {
+        Rectangle()
+            .fill(Theme.Line.hairline)
+            .frame(
+                width: axis == .vertical ? 1 : nil,
+                height: axis == .horizontal ? 1 : nil
             )
-        }
     }
 }

@@ -28,8 +28,6 @@ public struct RandomStringView: View {
 
             classes
 
-            ToolNote("随机源是 SystemRandomNumberGenerator（CSPRNG）—— 对应 Java 的 SecureRandom，不是 Math.random() / new Random()，后两个可预测")
-
             result
         }
         // 选项一动就重来一批。改完还要再点一次「生成」是多余的一步 ——
@@ -138,7 +136,7 @@ public struct RandomStringView: View {
                     ResultLine(number: index + 1, value: value)
                 }
             }
-            .panel(.well, radius: Theme.Radius.control)
+            .readingSurface(radius: Theme.Radius.control)
         }
     }
 
@@ -150,7 +148,6 @@ public struct RandomStringView: View {
         let number: Int
         let value: String
 
-        @Environment(\.accessibilityReduceMotion) private var reduceMotion
         @State private var isHovering = false
 
         var body: some View {
@@ -176,12 +173,11 @@ public struct RandomStringView: View {
             .background {
                 if isHovering {
                     RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
-                        .fill(Theme.Glass.hover)
+                        .fill(Theme.Fill.hover)
                 }
             }
             .contentShape(Rectangle())
             .onHover { isHovering = $0 }
-            .animation(Theme.Motion.fast(reduceMotion: reduceMotion), value: isHovering)
             .accessibilityElement(children: .contain)
             .accessibilityLabel("第 \(number) 个：\(value)")
         }

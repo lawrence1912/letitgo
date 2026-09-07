@@ -1,56 +1,83 @@
 import AppCore
 import AppKit
+import Observation
 import SwiftUI
 
 // MARK: - 槽位
 
 /// 色板里的一个位置。
 ///
-/// **视图层永远不写这个枚举** —— 它写 `Theme.Ink.primary` / `Theme.Glass.rim`。
+/// **视图层永远不写这个枚举** —— 它写 `Theme.Ink.primary` / `Theme.Line.hairline`。
 /// 这里是那些名字底下的槽位：每套主题给每个槽位填一条 `Ramp`（四种外观各一组值）。
 ///
 /// 加主题时这个枚举是**合同**：`Palette` 里的 switch 是穷尽的，
 /// 漏填一个槽位编译不过 —— 不会出现「换了主题某处还是上一套颜色」。
 enum ColorToken: String, CaseIterable, Sendable {
 
-    // 表面。这几个是「减弱透明度」时的实心替身，
-    // 日常绘制走下面的 glass* 薄膜。
-    case canvas, content, raised, sunken, hover, border, borderStrong, shadow
+    // MARK: 氛围场
+    //
+    // 玻璃底下那层**会被折射的东西**。系统的 Liquid Glass 是一层光学材质，
+    // 不是一块半透明的颜色 —— 它折射、弯折、采样的是背后真实存在的内容。
+    // 背后什么都没有的话，一块玻璃面板出来就是一块灰板。
+    // 所以这五个槽位不是装饰，它们是这套材质的**前提**。
 
-    // 文字
+    case backdrop
+    /// 能量星球的发光环。
+    case auraLead
+    /// 星球的暗球体。和 `auraLead` 是邻近色，不是补色。
+    case auraTrail
+    /// 星球的外晕；不需要第三层的主题把它设为全透明。
+    case auraDeep
+    /// 氛围底上那层细网格。玻璃底下垫一层**有规律的东西**，
+    /// 移动窗口、滚动内容时才看得出哪一层在动。
+    case gridLine
+
+    // MARK: 读写面
+    //
+    // 正文躺着的那块地：代码框、结果区、长文本。**唯一一块不上玻璃的表面**，
+    // 而且必须不上 —— 见 `Glass.swift` 里「什么东西不该是玻璃」那一节。
+    case well
+
+        // MARK: 玻璃的边
+        /// 左上那道镜面高光：**光**。六套共用一档冷白 —— 光没有主题。
+        case rimSpecular
+        /// 右下那道色散边：**色**。跟着每套主题自己的 accent 色相走。
+        case rimDispersion
+
+    // MARK: 文字
     case ink, inkSecondary, inkTertiary
 
-    // 品牌
-    case accent, accentFill, accentSoft, accentSoftBorder, onAccent
+    // MARK: 边界与悬停
+    //
+    // 系统玻璃自带边缘和高光，**不要再描一圈**。剩下这三个管的是玻璃管不着的东西：
+    // 分割线、自绘行的悬停底、需要读出来的容器边界（拖放高亮、聚焦的槽）。
+    case border, borderStrong, hover
+
+    // MARK: 品牌
+    //
+    // `accentFill` 现在的主要身份是**玻璃的 tint**（`Glass.tint(_:)`）和
+    // `.tint()` 递给系统控件的那个色，不再是自己画的一块填充。
+
+    case accent, accentFill, accentSoft, accentSoftBorder
+    /// 输入框聚焦时那一圈实线。比 `accent` 亮一档、浓一档 ——
+    /// `accent` 是个文字色，浅色外观下必须够深才读得清，拿它画环出来是道墨线。
+    case focusRing
     case info, infoSoft, infoSoftBorder
     case success, successSoft, successSoftBorder
     case danger, dangerSoft, dangerSoftBorder
-
-    // 玻璃
-    case backdrop
-    /// 氛围底上左上那团光晕。
-    case auraLead
-    /// 右下那团。和 `auraLead` 是**邻近色**，不是补色 —— 见 DESIGN.md。
-    case auraTrail
-    case glassChrome, glassContent, glassPanel, glassWell, glassFloating, glassHover
-    case glassRim, glassRimStrong, glassHighlight, glassShadow, glassShadowFloating
 }
 
 extension ColorToken {
 
-    /// 动态色：**绘制时**才去查「当前是哪套主题」和「当前是哪种外观」。
-    ///
-    /// 这是换主题不用重建颜色对象的原因 —— `NSColor(name:dynamicProvider:)`
-    /// 的闭包捕获的是**槽位**，不是色值。所以 `Theme.Ink.primary` 可以继续是个
-    /// `static let`，换主题之后它自己就变了。
-    ///
-    /// （但已经画出来的像素不会自己重画 —— 那需要重建视图树，
-    /// 见 `LetItGoApp` 里的 `.id(theme)`。）
+    /// 在视图求值时观察主题，绘制时再按系统外观解析这一套颜色。
+    @MainActor
     var color: Color { Color(nsColor: nsColor) }
 
+    @MainActor
     var nsColor: NSColor {
-        NSColor(name: nil) { appearance in
-            PaletteStore.current.ramp(for: self).nsColor(for: appearance)
+        let ramp = PaletteStore.current.ramp(for: self)
+        return NSColor(name: nil) { appearance in
+            ramp.nsColor(for: appearance)
         }
     }
 }
@@ -81,6 +108,9 @@ struct Palette: Sendable {
 
     static func of(_ theme: AppTheme) -> Palette {
         switch theme {
+        case .prism: .prism
+        case .nebula: .nebula
+        case .frost: .frost
         case .morandi: .morandi
         case .mist: .mist
         case .plain: .plain
@@ -90,18 +120,26 @@ struct Palette: Sendable {
 
 // MARK: - 当前色板
 
-/// 当前生效的色板。
-///
-/// **没有缓存，也没有可变全局状态** —— 每次取色都重新读一遍 UserDefaults。
-/// 这样做的理由不是省事，是省掉一整类 bug：只要有缓存，就会有「缓存什么时候刷新」
-/// 和「刷新和重绘谁先谁后」的问题 —— 而这两个问题的表现形式是「换了主题，
-/// 有一半界面还是旧颜色」，看着像 SwiftUI 的锅，其实是自己写的竞态。
-///
-/// 代价是每次解析颜色多一次 UserDefaults 读（内存里的字典查找，几百纳秒）。
-/// 一帧里颜色解析是几百次量级，量得出来但看不出来。
-enum PaletteStore {
-    static var current: Palette {
+/// 应用级外观状态。读取颜色的视图会观察它，不需要更换视图身份。
+@MainActor
+@Observable
+final class PaletteStore {
+    static let shared = PaletteStore()
+    var theme: AppTheme
+
+    private init() {
         let raw = UserDefaults.standard.string(forKey: AppTheme.storageKey) ?? ""
-        return .of(AppTheme(rawValue: raw) ?? .morandi)
+        theme = AppTheme(rawValue: raw) ?? .fallback
+    }
+
+    static var current: Palette {
+        .of(shared.theme)
+    }
+}
+
+extension Theme {
+    @MainActor
+    public static func apply(_ theme: AppTheme) {
+        PaletteStore.shared.theme = theme
     }
 }

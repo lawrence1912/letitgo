@@ -27,21 +27,6 @@ public enum Codec {
             case .hex: "十六进制"
             }
         }
-
-        /// 和 Java 那边的对应关系，以及**两边不一致的地方**。
-        /// 这行字是这个工具真正的价值 —— 转换本身谁都会写。
-        public var note: String {
-            switch self {
-            case .base64:
-                "对应 Base64.getEncoder() / getDecoder()，带 = 补位"
-            case .base64URL:
-                "对应 Base64.getUrlEncoder().withoutPadding()：+/ 换成 -_，不补 =（JWT 用的就是这种）"
-            case .url:
-                "空格编成 %20（RFC 3986 / java.net.URI）。URLEncoder 编成 + 是表单语义，两边不通用"
-            case .hex:
-                "小写，无分隔 —— 对应 String.format(\"%02x\", b)"
-            }
-        }
     }
 
     // MARK: - 编码

@@ -134,11 +134,6 @@ struct RSATests {
             try RSA.decrypt(ciphertext, privateKeyPEM: Fixture.pair.privateKey, padding: .oaepSHA256)
         }
     }
-
-    @Test("每种填充都写清楚了 Java 那边对应什么", arguments: RSA.Padding.allCases)
-    func everyPaddingDocumentsItsJavaCounterpart(padding: RSA.Padding) {
-        #expect(padding.note.contains("RSA/ECB/"))
-    }
 }
 
 @Suite("RSA · 工具页")

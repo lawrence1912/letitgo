@@ -39,41 +39,65 @@ struct FileItemRepositoryTests {
     @Test("写进去的数据换一个实例还读得到 —— 这条就是落盘的意义")
     func survivesNewInstance() async throws {
         let temp = TemporaryFile()
-        try await FileItemRepository(fileURL: temp.url).insert(Item(title: "留下来"))
+        try await FileItemRepository(fileURL: temp.url).insert(Item(text: "留下来"))
 
         // 全新实例 = 模拟应用重启，缓存是空的，只能从磁盘读。
         let reader = FileItemRepository(fileURL: temp.url)
-        #expect(try await reader.fetchAll().map(\.title) == ["留下来"])
+        #expect(try await reader.fetchAll().map(\.text) == ["留下来"])
     }
 
     @Test("按创建时间升序返回")
     func sortsByCreatedAt() async throws {
         let temp = TemporaryFile()
         let repository = FileItemRepository(fileURL: temp.url)
-        try await repository.insert(Item(title: "后", createdAt: .init(timeIntervalSince1970: 200)))
-        try await repository.insert(Item(title: "先", createdAt: .init(timeIntervalSince1970: 100)))
+        try await repository.insert(Item(text: "后", createdAt: .init(timeIntervalSince1970: 200)))
+        try await repository.insert(Item(text: "先", createdAt: .init(timeIntervalSince1970: 100)))
 
-        #expect(try await repository.fetchAll().map(\.title) == ["先", "后"])
+        #expect(try await repository.fetchAll().map(\.text) == ["先", "后"])
     }
 
     @Test("同 id 再插入是覆盖，不是追加")
     func insertSameIDUpdates() async throws {
         let temp = TemporaryFile()
         let repository = FileItemRepository(fileURL: temp.url)
-        let original = Item(title: "旧标题")
+        let original = Item(text: "旧的一条")
         try await repository.insert(original)
 
         var edited = original
-        edited.title = "新标题"
+        edited.text = "新的一条"
         try await repository.insert(edited)
 
-        #expect(try await repository.fetchAll().map(\.title) == ["新标题"])
+        #expect(try await repository.fetchAll().map(\.text) == ["新的一条"])
+    }
+
+    @Test("打勾会落盘，换一个实例还是完成的")
+    func updatePersists() async throws {
+        let temp = TemporaryFile()
+        let item = Item(text: "买牛奶")
+        try await FileItemRepository(fileURL: temp.url).insert(item)
+
+        var done = item
+        done.isDone = true
+        try await FileItemRepository(fileURL: temp.url).update(done)
+
+        #expect(try await FileItemRepository(fileURL: temp.url).fetchAll().map(\.isDone) == [true])
+    }
+
+    @Test("update 一条不存在的会抛 notFound —— 不是悄悄插一条新的进去")
+    func updateMissingThrows() async throws {
+        let temp = TemporaryFile()
+        let repository = FileItemRepository(fileURL: temp.url)
+
+        await #expect(throws: AppError.notFound) {
+            try await repository.update(Item(text: "幽灵", isDone: true))
+        }
+        #expect(try await repository.fetchAll().isEmpty)
     }
 
     @Test("删除会落盘，不只是改内存")
     func deletePersists() async throws {
         let temp = TemporaryFile()
-        let item = Item(title: "删我")
+        let item = Item(text: "删我")
         let repository = FileItemRepository(fileURL: temp.url)
         try await repository.insert(item)
         try await repository.delete(id: item.id)
@@ -87,7 +111,7 @@ struct FileItemRepositoryTests {
         let repository = FileItemRepository(fileURL: temp.url)
 
         await #expect(throws: AppError.notFound) {
-            try await repository.delete(id: Item(title: "x").id)
+            try await repository.delete(id: Item(text: "x").id)
         }
     }
 
@@ -112,7 +136,7 @@ struct FileItemRepositoryTests {
         let temp = TemporaryFile()
         let repository = FileItemRepository(fileURL: temp.url)
         try await repository.insert(
-            Item(title: "看得懂", createdAt: .init(timeIntervalSince1970: 0))
+            Item(text: "看得懂", createdAt: .init(timeIntervalSince1970: 0))
         )
 
         let text = try String(contentsOf: temp.url, encoding: .utf8)
@@ -124,31 +148,49 @@ struct FileItemRepositoryTests {
         #expect(createdAtPosition < idPosition)
     }
 
-    @Test("正文跟着一起落盘")
-    func persistsContent() async throws {
+    @Test("完成时间跟着一起落盘 —— 「已完成」那一列的排序全靠它")
+    func persistsCompletedAt() async throws {
         let temp = TemporaryFile()
+        let stamped = Date(timeIntervalSince1970: 1_000)
         try await FileItemRepository(fileURL: temp.url)
-            .insert(Item(title: "买菜", content: "西红柿\n鸡蛋"))
+            .insert(Item(text: "写周报", isDone: true, completedAt: stamped))
 
         let items = try await FileItemRepository(fileURL: temp.url).fetchAll()
-        #expect(items.map(\.content) == ["西红柿\n鸡蛋"])
+        #expect(items.map(\.completedAt) == [stamped])
     }
 
-    @Test("老的 items.json 没有 content 字段也读得出来 —— 缺席等于空正文，不是文件坏了")
-    func readsLegacyItemsWithoutContent() async throws {
+    @Test("多行的一条原样落盘")
+    func persistsMultilineText() async throws {
+        let temp = TemporaryFile()
+        try await FileItemRepository(fileURL: temp.url)
+            .insert(Item(text: "买菜\n西红柿\n鸡蛋"))
+
+        let items = try await FileItemRepository(fileURL: temp.url).fetchAll()
+        #expect(items.map(\.text) == ["买菜\n西红柿\n鸡蛋"])
+    }
+
+    @Test("备忘时代的 items.json 还读得出来 —— 标题和正文拼成一条待办，一个字不丢")
+    func readsLegacyMemoItems() async throws {
         let temp = TemporaryFile()
         try FileManager.default.createDirectory(
             at: temp.url.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
-        // 加正文那个字段之前，落盘的就是这个样子。这条要是红了，
-        // 用户之前写的**全部**内容会一起消失在「读不了 items.json」后面。
+        // 改成待办之前，落盘的就是这个样子（标题 + 可选的正文，没有 isDone）。
+        // 这条要是红了，用户之前写的**全部**内容会一起消失在
+        // 「读不了 items.json」后面。
         let legacy = """
         [
           {
             "createdAt" : "1970-01-01T00:00:00Z",
             "id" : "3F2504E0-4F89-11D3-9A0C-0305E82C3301",
-            "title" : "升级前写的"
+            "title" : "只有标题的那条"
+          },
+          {
+            "content" : "西红柿\\n鸡蛋",
+            "createdAt" : "1970-01-01T00:00:01Z",
+            "id" : "3F2504E0-4F89-11D3-9A0C-0305E82C3302",
+            "title" : "买菜"
           }
         ]
         """
@@ -156,7 +198,9 @@ struct FileItemRepositoryTests {
 
         let items = try await FileItemRepository(fileURL: temp.url).fetchAll()
 
-        #expect(items.map(\.title) == ["升级前写的"])
-        #expect(items.first?.content == "")
+        #expect(items.map(\.text) == ["只有标题的那条", "买菜\n西红柿\n鸡蛋"])
+        // 老记录没有 isDone / completedAt，缺席的意思是「还没做」。
+        #expect(items.allSatisfy { !$0.isDone })
+        #expect(items.allSatisfy { $0.completedAt == nil })
     }
 }

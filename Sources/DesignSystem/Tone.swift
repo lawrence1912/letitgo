@@ -6,9 +6,12 @@ import SwiftUI
 /// 每个色调给三个值：`tint`（文字 / 图标）、`soft`（填充）、`softBorder`（描边）。
 /// 三个一起用才有实体感 —— 只有浅底没有描边的色块在深色外观下会糊掉。
 ///
-/// `soft` / `softBorder` 和别的表面一样是**半透明薄膜**：底下的氛围底会透上来，
-/// 所以同一枚徽章压在内容区和压在侧边栏上是两个略微不同的颜色。
-/// 对比度按「压在最亮和最暗的那两处」都算过，四种外观下 tint 不低于 4.5:1。
+/// `soft` 现在的身份是**玻璃的 tint**（见 `GlassTone.semantic`）：一枚徽章
+/// 和它旁边的按钮是同一种材质，只是上了色。`softBorder` 留给玻璃管不着的
+/// 那几处 —— 拖放高亮的容器边、需要读出来的分隔。
+///
+/// `tint` 是实色，永远不靠玻璃提供对比度：四种外观下压在氛围场上都不低于 4.5:1，
+/// 有测试兜着（`Tests/DesignSystemTests`）。
 public enum Tone: Sendable, Hashable, CaseIterable {
     /// 不带情绪的信息。走中性色阶，不占用品牌色。
     case neutral
@@ -18,6 +21,7 @@ public enum Tone: Sendable, Hashable, CaseIterable {
     case success
     case danger
 
+    @MainActor
     public var tint: Color {
         switch self {
         case .neutral: Theme.Ink.secondary
@@ -28,9 +32,10 @@ public enum Tone: Sendable, Hashable, CaseIterable {
         }
     }
 
+    @MainActor
     public var soft: Color {
         switch self {
-        case .neutral: Theme.Glass.panel
+        case .neutral: Theme.Fill.hover
         case .accent: Theme.Brand.accentSoft
         case .info: Theme.Brand.infoSoft
         case .success: Theme.Brand.successSoft
@@ -38,9 +43,10 @@ public enum Tone: Sendable, Hashable, CaseIterable {
         }
     }
 
+    @MainActor
     public var softBorder: Color {
         switch self {
-        case .neutral: Theme.Glass.rim
+        case .neutral: Theme.Line.hairline
         case .accent: Theme.Brand.accentSoftBorder
         case .info: Theme.Brand.infoSoftBorder
         case .success: Theme.Brand.successSoftBorder

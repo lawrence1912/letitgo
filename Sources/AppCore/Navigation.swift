@@ -31,7 +31,7 @@ public enum SidebarItem: String, CaseIterable, Identifiable, Hashable, Sendable 
     public var title: String {
         switch self {
         case .overview: "概览"
-        case .items: "备忘"
+        case .items: "待办"
         case .activity: "活动"
         case .codec: "编解码"
         case .timestamp: "时间戳"
@@ -43,12 +43,15 @@ public enum SidebarItem: String, CaseIterable, Identifiable, Hashable, Sendable 
         }
     }
 
-    /// 一句话说明这个分区是干什么的。显示在详情区标题下面 ——
-    /// 一个装着好几个工具的外壳里，用户切过来第一眼要看的就是这行。
-    public var subtitle: String {
+    /// 一句话说明这个分区是干什么的。**界面上不画它** —— 页头和概览卡片
+    /// 都只写名字，一个工具是干什么的由它自己的界面说。
+    ///
+    /// 留着是因为辅助技术那边没有别的线索：图标、图标色、分组这些分辨手段
+    /// 读屏用户一个都用不上，所以侧边栏的行和概览的卡片都把这句话当 hint 念。
+    public var hint: String {
         switch self {
         case .overview: "点开一个分区，或者按它卡片上的快捷键"
-        case .items: "卡片式的备忘：标题、正文、时间，写完就落盘"
+        case .items: "一行一件事：写一行回车加上，点方框打勾，写完就落盘"
         case .activity: "操作历史与时间线"
         case .codec: "Base64 / URL / 十六进制，编码与解码"
         case .timestamp: "epoch 时间戳与日期互转，秒毫秒自动判断"
@@ -118,7 +121,7 @@ public enum SidebarItem: String, CaseIterable, Identifiable, Hashable, Sendable 
     public var systemImage: String {
         switch self {
         case .overview: "square.grid.2x2"
-        case .items: "note.text"
+        case .items: "checklist"
         case .activity: "clock.arrow.circlepath"
         case .codec: "arrow.left.arrow.right"
         case .timestamp: "calendar.badge.clock"

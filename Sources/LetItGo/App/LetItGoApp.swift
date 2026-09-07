@@ -16,28 +16,17 @@ struct LetItGoApp: App {
     @AppStorage(Appearance.storageKey) private var appearance: Appearance = .system
 
     /// 主题（哪一套色板）。和外观是两件正交的事，见 `AppCore/AppTheme.swift`。
-    ///
-    /// 这里读它只为了一件事：**换主题时给视图树换个身份**（下面的 `.id(theme)`）。
-    /// 色值本身不用推 —— `Theme.*` 的每个色都是绘制时才去查当前主题的动态色。
-    @AppStorage(AppTheme.storageKey) private var theme: AppTheme = .morandi
+    /// 更新可观察的色板，让现有视图重绘并保留编辑状态。
+    @AppStorage(AppTheme.storageKey) private var theme: AppTheme = .fallback
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(appState)
                 .environment(\.dependencies, dependencies)
-                // 换主题 = 重建视图树。
-                //
-                // 色值是活的（绘制时才查当前色板），但 SwiftUI 不知道该重绘 ——
-                // 视图树里没有任何东西「变了」，它会心安理得地复用上一帧的绘制结果。
-                // `.id()` 是唯一可靠的办法：换身份，整棵树重建，颜色重新解析。
-                //
-                // **代价**：树里的 `@State` 会重置 —— `HomeModel` 重新从磁盘读
-                // （看不出来），随机串那页刚生成的十串会换一批（看得出来）。
-                // `AppState`（当前分区、状态栏文字）活在这个 `.id` 外面，不受影响。
-                // 换主题是设置里的一次性动作，这个代价换的是「不会有一半界面
-                // 还是旧颜色」——那种 bug 更难查，也更难看。
-                .id(theme)
+                .onChange(of: theme, initial: true) { _, newValue in
+                    Theme.apply(newValue)
+                }
                 .frame(
                     minWidth: Theme.Size.sidebarMinWidth + Theme.Size.detailMinWidth,
                     minHeight: Theme.Size.windowMinHeight
@@ -48,19 +37,36 @@ struct LetItGoApp: App {
                 }
         }
         .defaultSize(width: 1020, height: 660)
-        // 隐藏系统标题栏：红绿灯浮在侧边栏顶部，应用自己拥有整个窗口表面。
-        // 标题栏本身还在（只是透明），所以窗口照样能从顶部拖动；
-        // 分区标题挪到了详情区自己的 `PageHeader` 里 —— 那里还能放一行说明，
-        // 系统标题栏放不下。
-        .windowStyle(.hiddenTitleBar)
+        // **标题栏回来了。** 上一版把它藏了（`.hiddenTitleBar`），
+        // 让应用自己拥有整个窗口表面、自己画一条页头。
+        //
+        // 那是 macOS 26 之前的正确答案：那时的标题栏是一块不透明的灰条，
+        // 藏掉它才能让界面连成一片。现在它是 Liquid Glass —— 内容从它底下穿过去，
+        // 藏掉反而是把系统白给的东西（滚动边缘渐隐、工具栏自定义、
+        // 全屏与窗口分屏的入口）一起扔了。
+        // 关掉窗口的自动状态恢复。
+        //
+        // 换成原生 `List(selection:)` 之后冒出来的一个坑：AppKit 会把列表的
+        // **选中行**存进 Saved Application State，下次启动再塞回绑定里 ——
+        // 于是 `AppState.selection` 的初始值（概览）在启动后被悄悄改掉，
+        // 而且改成什么是不确定的（存的是行号，分组一变就对不上）。
+        // 实测同一份构建连开三次，落在三个不同的分区上。
+        //
+        // 「当前在哪个分区」这件事只能有一个出处，那就是 `AppState` ——
+        // 菜单命令、⌘1–9、深链接改的都是它。所以这里把系统那条旁路关掉。
+        // 真要做「记住上次的分区」的话，得由我们自己存（设置里那个
+        // `restoreLastSection` 开关就是留给它的），而不是让 AppKit 从
+        // 一个行号里猜。
+        .restorationBehavior(.disabled)
         .commands { AppCommands(appState: appState) }
 
-        // ⌘, 打开的设置窗口。它是独立 Scene，所以 `.id(theme)` 要各挂一份 ——
-        // 主题选择器就在这个窗口里，它自己必须先跟着变。
+        // 设置可以独立于主窗口存在，也同步主题变化。
         Settings {
             SettingsView()
                 .environment(\.dependencies, dependencies)
-                .id(theme)
+                .onChange(of: theme, initial: true) { _, newValue in
+                    Theme.apply(newValue)
+                }
         }
     }
 }

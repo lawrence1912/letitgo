@@ -21,25 +21,6 @@ struct ToolPage<Content: View>: View {
     }
 }
 
-/// 选项栏下面那行小字：说清楚这个选项**和 Java 那边的差别在哪**。
-///
-/// 这行字是这几个工具真正的价值。转换本身谁都会写，
-/// 「URLEncoder 把空格编成 +」这种事才是每次都要重新查一遍的。
-struct ToolNote: View {
-    private let text: String
-
-    init(_ text: String) {
-        self.text = text
-    }
-
-    var body: some View {
-        Text(text)
-            .font(Theme.Typo.caption)
-            .foregroundStyle(Theme.Ink.tertiary)
-            .textSelection(.enabled)
-    }
-}
-
 /// 可输入的文本区。
 ///
 /// 用原生 `TextEditor`，只换外框 —— 输入法、撤销、拖放、VoiceOver 全在它本体里，
@@ -69,22 +50,29 @@ struct ToolInput: View {
             }
 
             TextEditor(text: $text)
-                .font(Theme.Typo.mono)
+                .font(Theme.Typo.monoBody)
                 .foregroundStyle(Theme.Ink.primary)
                 .scrollContentBackground(.hidden)
                 .padding(.horizontal, Theme.Spacing.xs)
                 .padding(.vertical, Theme.Spacing.xs)
                 .frame(minHeight: minHeight)
-                .panel(.well, radius: Theme.Radius.control, rim: isFocused ? Theme.Brand.accent : nil)
+                .field(focused: isFocused)
                 .overlay(alignment: .topLeading) {
                     // `TextEditor` 没有 placeholder，自己叠一层。
                     // 它不接受点击，否则会挡住第一次点进去的那一下。
                     if text.isEmpty {
                         Text(placeholder)
-                            .font(Theme.Typo.mono)
+                            // 和 `TextEditor` 用同一个字号，并且**补上那 5pt
+                            // 行内缩进** —— 否则 placeholder 和光标对不齐。
+                            // 之前这里横竖都写 `sm`，而编辑器写的是 `xs`：
+                            // 竖直差 4pt、水平差 1pt，空框时一眼能看出来。
+                            .font(Theme.Typo.monoBody)
                             .foregroundStyle(Theme.Ink.tertiary)
-                            .padding(.horizontal, Theme.Spacing.sm)
-                            .padding(.vertical, Theme.Spacing.sm)
+                            .padding(
+                                .horizontal,
+                                Theme.Spacing.xs + Theme.Size.textEditorInlineInset
+                            )
+                            .padding(.vertical, Theme.Spacing.xs)
                             .allowsHitTesting(false)
                     }
                 }
@@ -128,7 +116,7 @@ struct ToolOutput: View {
                     .padding(Theme.Spacing.sm)
             }
             .frame(minHeight: minHeight)
-            .panel(.well, radius: Theme.Radius.control)
+            .readingSurface(radius: Theme.Radius.control)
             .accessibilityElement(children: .combine)
             .accessibilityLabel("\(title)：\(value)")
         }
@@ -183,7 +171,6 @@ struct CopyButton: View {
     private let value: String
     private let title: String?
     @State private var justCopied = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(_ value: String, title: String? = nil) {
         self.value = value
@@ -205,7 +192,6 @@ struct CopyButton: View {
             }
         }
         .disabled(value.isEmpty)
-        .animation(Theme.Motion.fast(reduceMotion: reduceMotion), value: justCopied)
         // 纯图标按钮必须显式给名字。状态也要念出来 —— 对勾对 VoiceOver 不存在。
         .accessibilityLabel(justCopied ? "已复制" : (title ?? "复制"))
         .help(title ?? "复制")

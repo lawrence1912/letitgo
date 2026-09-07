@@ -11,6 +11,13 @@
 /// 那边的 switch 是穷尽的，漏填编译不过。对比度有测试兜着
 /// （`Tests/DesignSystemTests`），填错了跑测试就会红。
 public enum AppTheme: String, CaseIterable, Identifiable, Hashable, Sendable, Codable {
+    /// 棱镜：饱和度拉满的那一档 —— 最主流的那套科幻蓝，近黑深蓝打底，
+    /// 主操作是电光青，三团光晕透过最薄的一层玻璃。**默认就是它**。
+    case prism
+    /// 星云：暖炭打底，琥珀点睛。三团光晕 + 细网格 + 玫瑰色尾光。
+    case nebula
+    /// 霜白：近白打底，湖蓝点睛。最亮、最透的一档。
+    case frost
     /// 莫兰迪：暖灰打底，陶土 / 雾霾蓝 / 鼠尾草 / 干玫瑰。
     case morandi
     /// 雾青：蓝灰打底，青 / 蓝 / 绿 / 红，同样是降饱和那一档。
@@ -24,8 +31,15 @@ public enum AppTheme: String, CaseIterable, Identifiable, Hashable, Sendable, Co
 
     public var id: String { rawValue }
 
+    /// 默认主题。`PaletteStore` 和每个 `@AppStorage(AppTheme.storageKey)` 都读它 ——
+    /// 换默认值只改这一处，不用去各个视图里找那串 `= .morandi`。
+    public static let fallback: AppTheme = .prism
+
     public var title: String {
         switch self {
+        case .prism: "棱镜"
+        case .nebula: "星云"
+        case .frost: "霜白"
         case .morandi: "莫兰迪"
         case .mist: "雾青"
         case .plain: "素白"
@@ -35,6 +49,9 @@ public enum AppTheme: String, CaseIterable, Identifiable, Hashable, Sendable, Co
     /// 设置里那行说明。说的是**这套色板长什么样**，不是形容词堆砌。
     public var subtitle: String {
         switch self {
+        case .prism: "科幻蓝，最透的一档"
+        case .nebula: "暖调深空，琥珀点睛"
+        case .frost: "近白打底，湖蓝点睛"
         case .morandi: "暖灰打底，陶土点睛"
         case .mist: "蓝灰打底，青色点睛"
         case .plain: "中性灰打底，石墨点睛"

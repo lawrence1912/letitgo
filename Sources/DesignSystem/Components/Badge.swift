@@ -109,7 +109,13 @@ public struct IconTile: View {
             .font(.system(size: size * 0.44, weight: .medium))
             .foregroundStyle(foreground)
             .frame(width: size, height: size)
-            .softFill(fill: fill, border: border, radius: size * 0.3)
+            .background(
+                RoundedRectangle(cornerRadius: size * 0.3, style: .continuous).fill(fill)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: size * 0.3, style: .continuous)
+                    .strokeBorder(border, lineWidth: 1)
+            )
             .accessibilityHidden(true)
     }
 }

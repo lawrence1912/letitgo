@@ -44,6 +44,13 @@ public actor FileItemRepository: ItemRepository {
         try persist(items)
     }
 
+    public func update(_ item: Item) async throws {
+        var items = try loadIfNeeded()
+        guard items[item.id] != nil else { throw AppError.notFound }
+        items[item.id] = item
+        try persist(items)
+    }
+
     public func delete(id: Item.ID) async throws {
         var items = try loadIfNeeded()
         guard items.removeValue(forKey: id) != nil else {

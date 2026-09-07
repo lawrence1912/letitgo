@@ -10,7 +10,6 @@ public struct TimestampView: View {
     public var body: some View {
         ToolPage {
             options
-            ToolNote("System.currentTimeMillis() 给毫秒，Instant.getEpochSecond() 给秒 —— 默认按量级自动判断，判断结果写在下面")
             input
             results
         }
@@ -37,6 +36,8 @@ public struct TimestampView: View {
         }
     }
 
+    @FocusState private var isFocused: Bool
+
     private var input: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
             HStack {
@@ -53,11 +54,12 @@ public struct TimestampView: View {
 
             TextField("1700000000000", text: $model.input)
                 .textFieldStyle(.plain)
-                .font(Theme.Typo.mono)
+                .font(Theme.Typo.monoBody)
                 .foregroundStyle(Theme.Ink.primary)
                 .padding(.horizontal, Theme.Spacing.sm)
                 .frame(height: 32)
-                .panel(.well, radius: Theme.Radius.control)
+                .focused($isFocused)
+                .field(focused: isFocused)
                 .accessibilityLabel("时间戳或日期")
         }
     }
@@ -72,7 +74,7 @@ public struct TimestampView: View {
                     ResultRow(label: row.label, value: row.value, detail: row.detail)
                 }
             }
-            .panel()
+            .referenceGlassPanel(accent: Theme.Brand.info)
 
         case .failure(let failure):
             NoticeView(.danger, title: "读不出来", message: failure.message)

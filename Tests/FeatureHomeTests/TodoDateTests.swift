@@ -2,12 +2,12 @@ import Foundation
 import Testing
 @testable import FeatureHome
 
-/// 卡片页脚那行时间的用例。
+/// 每行待办后面那行时间的用例。
 ///
 /// 「今天」是相对的，所以 `now` 和日历都从外面给 —— 这几条才不会
 /// 跑到明天就红，也不会因为跑在别的时区上而红。
-@Suite("备忘时间")
-struct MemoDateTests {
+@Suite("待办时间")
+struct TodoDateTests {
 
     /// 固定时区，跟本机设置无关。
     private let calendar: Calendar = {
@@ -23,7 +23,7 @@ struct MemoDateTests {
     }
 
     private func label(_ date: Date, now: Date) -> String {
-        MemoDate.label(for: date, now: now, calendar: calendar)
+        TodoDate.label(for: date, now: now, calendar: calendar)
     }
 
     @Test("今天写的显示「今天 时:分」")
@@ -43,19 +43,19 @@ struct MemoDateTests {
         )
     }
 
-    @Test("同一年里的旧备忘显示「月日 时:分」")
+    @Test("同一年里的旧待办显示「月日 时:分」")
     func earlierThisYear() {
         let now = date(2026, 8, 30, 20, 0)
         #expect(label(date(2026, 8, 1, 7, 0), now: now) == "8月1日 07:00")
     }
 
-    @Test("跨年的备忘只到日 —— 隔了一年，几点写的已经没意义了")
+    @Test("跨年的待办只到日 —— 隔了一年，几点写的已经没意义了")
     func previousYear() {
         let now = date(2026, 8, 30, 20, 0)
         #expect(label(date(2025, 12, 31, 23, 30), now: now) == "2025年12月31日")
     }
 
-    @Test("时分补零，一列卡片的时间才对得齐")
+    @Test("时分补零，一列时间才对得齐")
     func padsClock() {
         let now = date(2026, 8, 30, 20, 0)
         #expect(label(date(2026, 8, 30, 0, 0), now: now) == "今天 00:00")

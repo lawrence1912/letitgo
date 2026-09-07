@@ -25,8 +25,6 @@ public struct JSONView: View {
                 Spacer(minLength: Theme.Spacing.sm)
             }
 
-            ToolNote("转义过的 JSON（引号是 \\\"）和中文引号（“ ”）都会自动认出来并修好，修了什么会写在输入框上面；「Java 字面量」是反过来那一步，改完直接粘回代码")
-
             VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                 // 为了能解析而动过的地方，一条条摆出来 ——
                 // 悄悄「帮你修好」是最难查的一类行为：用户会以为原始数据是好的，
@@ -81,7 +79,7 @@ public struct JSONView: View {
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(Theme.Spacing.sm)
-                            .panel(.well, radius: Theme.Radius.control)
+                            .readingSurface(radius: Theme.Radius.control)
                     }
                 }
             }

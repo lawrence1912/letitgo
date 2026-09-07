@@ -21,7 +21,7 @@ let swiftSettings: [SwiftSetting] = [
 
 let package = Package(
     name: "LetItGo",
-    platforms: [.macOS(.v15)],
+    platforms: [.macOS("26.0")],
     products: [
         .library(name: "AppCore", targets: ["AppCore"]),
         .library(name: "DesignSystem", targets: ["DesignSystem"]),
@@ -37,6 +37,7 @@ let package = Package(
         .target(
             name: "DesignSystem",
             dependencies: ["AppCore"],
+            resources: [.process("Resources")],
             swiftSettings: swiftSettings
         ),
         .target(

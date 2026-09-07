@@ -6,8 +6,8 @@ import SwiftUI
 ///
 /// 这里以前是块留白。留白本身没问题（它证明壳能装下更多东西），但侧边栏长到
 /// 八项之后，「打开应用第一眼看到的那一页」就该干点事：把能用的分区摊开，
-/// 每张卡片带着它那句说明和键盘编号 —— 说明是让人知道该点哪个，
-/// 编号是让人下次不用点。
+/// 每张卡片就是图标 + 名字 + 键盘编号 —— 编号是让人下次不用点。
+/// 卡面上不写说明（见 `NavigationCard`）：这一页是入口墙，不是目录。
 ///
 /// 两条规矩：
 ///
@@ -21,7 +21,7 @@ struct OverviewView: View {
     @Environment(AppState.self) private var appState
 
     private let columns = [
-        GridItem(.adaptive(minimum: 190), spacing: Theme.Spacing.md)
+        GridItem(.adaptive(minimum: 210, maximum: 300), spacing: Theme.Spacing.md)
     ]
 
     var body: some View {
@@ -46,14 +46,20 @@ struct OverviewView: View {
                 .font(Theme.Typo.headline)
                 .foregroundStyle(Theme.Ink.secondary)
 
+            // **不包 `GlassEffectContainer`。** 试过，结果是相邻卡片的内容互相
+            // 渗进对方的玻璃里 —— 一张卡的左边缘上浮着隔壁卡的半个字。
+            //
+            // 那个容器的用途是把几块玻璃**合并成一块**来渲染（让它们的边互相影响、
+            // 让选中块在其间形变）。入口卡恰恰相反：它们是**各自独立的面板**，
+            // 合并渲染对它们不是优化，是错误。
             LazyVGrid(columns: columns, spacing: Theme.Spacing.md) {
                 ForEach(items) { item in
                     NavigationCard(
                         systemImage: item.systemImage,
                         tint: item.tint,
                         title: item.title,
-                        subtitle: item.subtitle,
-                        hint: item.shortcutNumber.map { "⌘\($0)" }
+                        shortcut: item.shortcutNumber.map { "⌘\($0)" },
+                        spokenHint: item.hint
                     ) {
                         appState.selection = item
                     }

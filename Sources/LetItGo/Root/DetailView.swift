@@ -4,7 +4,8 @@ import FeatureHome
 import FeatureToolbox
 import SwiftUI
 
-/// 路由层：把侧边栏的选中项映射到具体的功能模块，并给每个分区戴上同一顶标题栏。
+/// 路由层：把侧边栏的选中项映射到具体的功能模块，并把当前分区的主操作
+/// 挂到窗口工具栏上。
 ///
 /// switch 是穷尽的 —— 给 `SidebarItem` 加 case 时编译器会在这里报错，
 /// 提醒你把新界面接上，不会出现「加了菜单但没有页面」的情况。
@@ -18,35 +19,35 @@ struct DetailView: View {
 
     var body: some View {
         content
+            .transition(.identity)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            // 页头浮在内容上方（不是叠在它前面的一格），内容从它底下滚过去。
-            // 换成玻璃之后这件事有了意义：页头那层模糊终于有东西可模糊。
-            .safeAreaInset(edge: .top, spacing: 0) { header }
-            // 玻璃薄膜在上、氛围底在下 —— `.background` 每加一层都往后垫。
-            .glassBackground(.content)
-            .ambientBackdrop()
-            // 窗口标题栏是隐藏的，但这个值仍然是窗口在「窗口」菜单、
-            // Mission Control 和辅助功能里的名字，不能省。
+            // 氛围场垫在最底下。工具栏那层玻璃折射的就是它 ——
+            // 内容默认从工具栏底下穿过去（macOS 26 的 chrome 是浮在内容上的），
+            // 所以滚动时能看见字从玻璃后面走过。
+            .ambientBackdrop(showsPlanet: true)
+            // 窗口标题栏回来了，分区标题就还给它。
+            //
+            // 上一版是自绘的 `PageHeader`：无标题栏窗口 + 详情区顶部一条
+            // 52pt 高的自画标题栏。那套的理由是「系统标题栏放不下
+            // 分区标题 + 这个分区的主操作那一行」—— 在 macOS 26 上不成立了：
+            // 工具栏本身是 Liquid Glass，能装下标题和操作，还自带
+            // 滚动边缘渐隐、窗口拖动、全屏按钮和自定义能力。
+            //
+            // 顺带删掉的还有那个 `trafficLightInset` —— 红绿灯回到了标题栏里，
+            // 不再需要侧边栏顶部给它硬留 28pt。
             .navigationTitle(appState.selection?.title ?? "LetItGo")
-    }
-
-    private var header: some View {
-        PageHeader(
-            appState.selection?.title ?? "LetItGo",
-            subtitle: appState.selection?.subtitle
-        ) {
-            if let newItemAction {
-                Button {
-                    newItemAction()
-                } label: {
-                    Label(newItemAction.title, systemImage: "plus")
+            .toolbar {
+                if let newItemAction {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            newItemAction()
+                        } label: {
+                            Label(newItemAction.title, systemImage: "plus")
+                        }
+                        .help("\(newItemAction.title)（⌘N）")
+                    }
                 }
-                // 次要样式，不是主按钮：空态里那个大按钮才是主操作。
-                // 一屏只留一个响亮的按钮，两个一样响的等于没有主次。
-                .buttonStyle(.secondaryAction)
-                .help("\(newItemAction.title)（⌘N）")
             }
-        }
     }
 
     @ViewBuilder

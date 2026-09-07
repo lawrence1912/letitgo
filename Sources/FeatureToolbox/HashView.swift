@@ -10,7 +10,6 @@ public struct HashView: View {
     public var body: some View {
         ToolPage {
             options
-            ToolNote("文本按 UTF-8 取字节。Java 那边 s.getBytes() 用平台默认字符集（中文 Windows 上是 GBK），要写 getBytes(StandardCharsets.UTF_8) 才对得上")
             ToolInput(title: "输入", placeholder: "要算摘要的文本", text: $model.input)
             results
         }
@@ -53,7 +52,7 @@ public struct HashView: View {
                     )
                 }
             }
-            .panel()
+            .referenceGlassPanel(accent: Theme.Brand.info)
         }
     }
 }

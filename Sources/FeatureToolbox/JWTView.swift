@@ -4,6 +4,7 @@ import SwiftUI
 /// JWT 拆解与验签。
 public struct JWTView: View {
     @State private var model = JWTModel()
+    @FocusState private var isSecretFocused: Bool
 
     public init() {}
 
@@ -17,8 +18,6 @@ public struct JWTView: View {
                 text: $model.token,
                 minHeight: 88
             )
-
-            ToolNote("整段在本机跑，不发任何请求 —— 生产环境的 access token 粘网页版工具里，等于把一份还没过期的凭证交出去了")
 
             switch model.decoded {
             case nil:
@@ -78,7 +77,7 @@ public struct JWTView: View {
                     )
                 }
             }
-            .panel()
+            .referenceGlassPanel(accent: Theme.Brand.info)
         }
     }
 
@@ -103,11 +102,12 @@ public struct JWTView: View {
 
             SecureField("HMAC 密钥", text: $model.secret)
                 .textFieldStyle(.plain)
-                .font(Theme.Typo.mono)
+                .font(Theme.Typo.monoBody)
                 .foregroundStyle(Theme.Ink.primary)
                 .padding(.horizontal, Theme.Spacing.sm)
                 .frame(height: 30)
-                .panel(.well, radius: Theme.Radius.control)
+                .focused($isSecretFocused)
+                .field(focused: isSecretFocused)
                 // placeholder 不算 label —— 一输入内容它就没了。
                 .accessibilityLabel("HMAC 密钥")
         }

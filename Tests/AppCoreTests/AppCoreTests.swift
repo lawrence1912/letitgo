@@ -4,11 +4,11 @@ import Testing
 
 @Suite("导航")
 struct NavigationTests {
-    @Test("每个分区都有标题、说明和图标")
+    @Test("每个分区都有标题、念给读屏的说明和图标")
     func sidebarItemsAreComplete() {
         for item in SidebarItem.allCases {
             #expect(!item.title.isEmpty)
-            #expect(!item.subtitle.isEmpty)
+            #expect(!item.hint.isEmpty)
             #expect(!item.systemImage.isEmpty)
         }
     }
@@ -115,18 +115,18 @@ struct InMemoryItemRepositoryTests {
 
     @Test("按创建时间升序返回")
     func sortsByCreatedAt() async throws {
-        let older = Item(title: "先", createdAt: .init(timeIntervalSince1970: 100))
-        let newer = Item(title: "后", createdAt: .init(timeIntervalSince1970: 200))
+        let older = Item(text: "先", createdAt: .init(timeIntervalSince1970: 100))
+        let newer = Item(text: "后", createdAt: .init(timeIntervalSince1970: 200))
         let repository = InMemoryItemRepository(seed: [newer, older])
 
         let result = try await repository.fetchAll()
-        #expect(result.map(\.title) == ["先", "后"])
+        #expect(result.map(\.text) == ["先", "后"])
     }
 
     @Test("插入后能读回")
     func insertThenFetch() async throws {
         let repository = InMemoryItemRepository()
-        let item = Item(title: "一条")
+        let item = Item(text: "一条")
         try await repository.insert(item)
         #expect(try await repository.fetchAll() == [item])
     }
@@ -135,7 +135,16 @@ struct InMemoryItemRepositoryTests {
     func deleteMissingThrows() async throws {
         let repository = InMemoryItemRepository()
         await #expect(throws: AppError.notFound) {
-            try await repository.delete(id: Item(title: "x").id)
+            try await repository.delete(id: Item(text: "x").id)
         }
+    }
+
+    @Test("update 不存在的 id 会抛 notFound —— insert 是 upsert，update 不是")
+    func updateMissingThrows() async throws {
+        let repository = InMemoryItemRepository()
+        await #expect(throws: AppError.notFound) {
+            try await repository.update(Item(text: "幽灵"))
+        }
+        #expect(try await repository.fetchAll().isEmpty)
     }
 }

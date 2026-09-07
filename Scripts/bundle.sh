@@ -39,6 +39,8 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 cp "$BIN" "$APP/Contents/MacOS/$APP_NAME"
+# 将 SwiftPM 资源放进 macOS 的标准资源目录，由 AmbientBackdrop 优先加载。
+cp -R "$(dirname "$BIN")/LetItGo_DesignSystem.bundle" "$APP/Contents/Resources/LetItGo_DesignSystem.bundle"
 cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
 
 # 有图标就带上（Resources/AppIcon.icns，可选）

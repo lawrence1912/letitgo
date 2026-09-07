@@ -27,8 +27,6 @@ public struct RSAView: View {
                 Spacer(minLength: Theme.Spacing.sm)
             }
 
-            ToolNote(model.options.padding.note)
-
             ToolInput(
                 title: model.options.mode.keyTitle,
                 placeholder: "-----BEGIN PUBLIC KEY-----  —— openssl 和 Java 吐出来的那种，直接粘",

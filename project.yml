@@ -11,7 +11,7 @@ name: LetItGo
 options:
   bundleIdPrefix: com.lawrence
   deploymentTarget:
-    macOS: "15.0"
+    macOS: "26.0"
   createIntermediateGroups: true
   developmentLanguage: zh-Hans
   generateEmptyDirectories: true

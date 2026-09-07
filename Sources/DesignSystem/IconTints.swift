@@ -32,15 +32,20 @@ enum IconRole {
 extension IconTint {
 
     /// 图标本身的颜色。
+    @MainActor
     public var tint: Color { color(.tint) }
     /// 图标底板。
+    @MainActor
     public var soft: Color { color(.soft) }
     /// 底板的描边。
+    @MainActor
     public var softBorder: Color { color(.softBorder) }
 
+    @MainActor
     private func color(_ role: IconRole) -> Color {
-        Color(nsColor: NSColor(name: nil) { appearance in
-            ramp(role, in: PaletteStore.current).nsColor(for: appearance)
+        let ramp = ramp(role, in: PaletteStore.current)
+        return Color(nsColor: NSColor(name: nil) { appearance in
+            ramp.nsColor(for: appearance)
         })
     }
 
@@ -56,8 +61,8 @@ extension IconTint {
         switch role {
         case .tint:
             return Ramp(
-                light: OKLCH(0.480, 0.070 * scale, hue),
-                dark: OKLCH(0.780, 0.065 * scale, hue),
+                light: OKLCH(0.470, 0.070 * scale, hue),
+                dark: OKLCH(palette.theme == .prism ? 0.815 : 0.780, 0.065 * scale, hue),
                 lightHC: OKLCH(0.385, 0.082 * scale, hue),
                 darkHC: OKLCH(0.865, 0.070 * scale, hue)
             )

@@ -7,6 +7,11 @@ import Foundation
 public protocol ItemRepository: Sendable {
     func fetchAll() async throws -> [Item]
     func insert(_ item: Item) async throws
+    /// 覆盖已经存在的一条。id 不存在时抛 `AppError.notFound`。
+    ///
+    /// 为什么不复用 `insert`：`insert` 是 upsert，往一条已经被删掉的待办上打勾
+    /// 会让它**原地复活**。打勾改的是既有的东西，找不到就该报错。
+    func update(_ item: Item) async throws
     func delete(id: Item.ID) async throws
 }
 
@@ -16,5 +21,6 @@ public struct EmptyItemRepository: ItemRepository {
     public init() {}
     public func fetchAll() async throws -> [Item] { [] }
     public func insert(_ item: Item) async throws {}
+    public func update(_ item: Item) async throws {}
     public func delete(id: Item.ID) async throws {}
 }

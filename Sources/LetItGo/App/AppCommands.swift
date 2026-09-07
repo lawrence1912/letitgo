@@ -6,7 +6,7 @@ import SwiftUI
 struct AppCommands: Commands {
     let appState: AppState
 
-    /// 当前界面登记的动作。没有界面登记时是 nil —— 于是「新建备忘」
+    /// 当前界面登记的动作。没有界面登记时是 nil —— 于是「新建待办」
     /// 在概览 / 活动分区自动变灰，「删除」在没选中东西时自动变灰，
     /// 这里不需要写任何判断分区、判断选中的代码。
     @FocusedValue(\.newItemAction) private var newItemAction
@@ -15,7 +15,7 @@ struct AppCommands: Commands {
     var body: some Commands {
         // 替换「文件 > 新建」
         CommandGroup(replacing: .newItem) {
-            // 文案由登记方给：备忘分区显示「新建备忘」，别的分区自己说自己的。
+            // 文案由登记方给：待办分区显示「新建待办」，别的分区自己说自己的。
             // 没人登记时给个中性的回落文案，反正那时它是灰的。
             Button(newItemAction?.title ?? "新建") { newItemAction?() }
                 .keyboardShortcut("n", modifiers: .command)
